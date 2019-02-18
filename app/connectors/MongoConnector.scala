@@ -45,7 +45,12 @@ class MongoConnector {
   }
 
   def createPost(post: Post): Future[Unit] = {
-    postsCollection.flatMap(_.insert.one(post).map(_ => {}))
+    val trimmedPost = post.copy (
+      id = post.id.trim,
+      title = post.title.trim,
+      body = post.body.trim
+    )
+    postsCollection.flatMap(_.insert.one(trimmedPost).map(_ => {}))
   }
 
   def updatePerson(post: Post): Future[Int] = {
