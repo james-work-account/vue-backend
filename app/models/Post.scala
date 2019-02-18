@@ -6,6 +6,7 @@ case class Post(id: String, title: String, body: String)
 
 object Post {
   implicit val reads: Reads[Post] = Json.reads[Post]
+
   implicit val writes: Writes[Post] = new Writes[Post] {
     override def writes(o: Post): JsValue = Json.obj(
       "id" -> o.id,
