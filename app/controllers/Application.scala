@@ -29,11 +29,12 @@ class Application @Inject()(mongoConnector: MongoConnector) extends Controller {
   def getSinglePost(id: String): Action[AnyContent] = Action.async {
     mongoConnector.getPost(id).map {
       post =>
-        val jsonPost = if (post.isDefined) Json.toJson(post) else {
+        if (post.isDefined) {
+          Ok(Json.toJson(post))
+        } else {
           logger.info(s"No message found with ID [$id]")
-          Json.obj()
+          NoContent
         }
-        Ok(jsonPost)
     }.recover {
       case ex =>
         logger.error(ex.getMessage, ex)
