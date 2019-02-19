@@ -2,36 +2,38 @@ package connectors
 
 import javax.inject.Singleton
 import models.Post
+import org.slf4j
+import play.api.Logger
 import play.api.libs.json.Json
-import reactivemongo.api.Cursor.WithOps
-import reactivemongo.api.collections.bson.BSONCollection
 import reactivemongo.api._
-import reactivemongo.bson.{BSONDocument, BSONDocumentReader, BSONDocumentWriter, Macros, document}
+import reactivemongo.api.collections.bson.BSONCollection
+import reactivemongo.bson.{BSONDocument, BSONDocumentReader, BSONDocumentWriter, Macros, document, _}
+import reactivemongo.play.json._
 
 import scala.concurrent.Future
-import reactivemongo.play.json._
-import reactivemongo.bson._
-import reactivemongo.api.collections.bson.BSONCollection
 
 @Singleton
 class MongoConnector {
+
+  val logger: slf4j.Logger = Logger.logger
+
   import scala.concurrent.ExecutionContext.Implicits.global
 
   private val mongoUri = "mongodb://localhost:27017/vue-db?authMode=scram-sha1"
 
   private val driver = MongoDriver()
   private val parsedUri = MongoConnection.parseURI(mongoUri)
-  private val connection = parsedUri.map(driver.connection(_))
+  private val connection = parsedUri.map(driver.connection)
   private val futureConnection = Future.fromTry(connection)
 
-  futureConnection.map(println)
-
   private def vueDB: Future[DefaultDB] = futureConnection.flatMap(_.database("vue-db"))
+
   private def postsCollection: Future[BSONCollection] = vueDB.map(_.collection("posts"))
 
   implicit def postDbWriter: BSONDocumentWriter[Post] = new BSONDocumentWriter[Post] {
     override def write(t: Post): BSONDocument = Post.writesToDb.writes(t).as[BSONDocument]
   }
+
   implicit def postReader: BSONDocumentReader[Post] = Macros.reader[Post]
 
   def getAllPosts: Future[List[Post]] = {
@@ -44,23 +46,14 @@ class MongoConnector {
     postsCollection.flatMap(_.find(query, None)(JsObjectWriter, JsObjectWriter).one[Post])
   }
 
-  def createPost(post: Post): Future[Unit] = {
-    val trimmedPost = post.copy (
-      id = post.id.trim,
-      title = post.title.trim,
-      body = post.body.trim
-    )
-    postsCollection.flatMap(_.insert.one(trimmedPost).map(_ => {}))
+  def upsertPost(post: Post): Future[Int] = {
+    val selector = document("id" -> post.id)
+    postsCollection.flatMap(_.update.one(selector, post, upsert = true).map(_.n))
   }
 
-  def updatePerson(post: Post): Future[Int] = {
-    val selector = document(
-      "title" -> post.title,
-      "body" -> post.body
-    )
-
-    // Update the matching person
-    postsCollection.flatMap(_.update.one(selector, post).map(_.n))
+  def deletePost(post: Post): Future[Int] = {
+    val selector = document("id" -> post.id, "title" -> post.title, "body" -> post.body)
+    postsCollection.flatMap(_.delete.one(selector).map(_.n))
   }
 
 }

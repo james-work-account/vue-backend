@@ -13,12 +13,16 @@ import scala.concurrent.Future
 
 class Application @Inject()(mongoConnector: MongoConnector) extends Controller {
 
-  val logger = Logger(this.getClass)
+  val logger: slf4j.Logger = Logger.logger
 
   def getAllPosts(): Action[AnyContent] = Action.async {
     mongoConnector.getAllPosts.map {
       posts =>
         Ok(Json.toJson(posts))
+    }.recover {
+      case ex =>
+        logger.error(ex.getMessage, ex)
+        InternalServerError(ex.getMessage)
     }
   }
 
@@ -30,17 +34,21 @@ class Application @Inject()(mongoConnector: MongoConnector) extends Controller {
           Json.obj()
         }
         Ok(jsonPost)
+    }.recover {
+      case ex =>
+        logger.error(ex.getMessage, ex)
+        InternalServerError(ex.getMessage)
     }
   }
 
-  def createPost(): Action[AnyContent] = Action.async {
+  def upsertPost(): Action[AnyContent] = Action.async {
     implicit request =>
       val post = request.body.asJson.getOrElse(Json.obj()).as[Post]
       val errors = validatePost(post)
       if (errors.isEmpty) {
-        mongoConnector.createPost(post).map {
+        mongoConnector.upsertPost(post).map {
           _ =>
-            logger.info(s"Created Post with ID [${post.id}]")
+            logger.info(s"[upsertPost] successful")
             NoContent
         }.recover {
           case ex =>
@@ -53,6 +61,20 @@ class Application @Inject()(mongoConnector: MongoConnector) extends Controller {
           case list: List[String] => logger.error(s"Could not create post - fields [${list.mkString(", ")}] are required")
         }
         Future.successful(BadRequest(s"Required: ${errors.mkString(", ")}"))
+      }
+  }
+
+  def deletePost(): Action[AnyContent] = Action.async {
+    implicit request =>
+      val post = request.body.asJson.getOrElse(Json.obj()).as[Post]
+      mongoConnector.deletePost(post).map {
+        _ =>
+          logger.info(s"[deletePost] successful or no post to be deleted")
+          NoContent
+      }.recover {
+        case ex =>
+          logger.error(ex.getMessage, ex)
+          InternalServerError(ex.getMessage)
       }
   }
 
