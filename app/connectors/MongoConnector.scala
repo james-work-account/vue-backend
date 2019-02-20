@@ -37,7 +37,7 @@ class MongoConnector {
   implicit def postReader: BSONDocumentReader[Post] = Macros.reader[Post]
 
   def getAllPosts: Future[List[Post]] = {
-    postsCollection.flatMap(_.find(Json.obj(), None)(JsObjectWriter, JsObjectWriter).cursor[Post]()
+    postsCollection.flatMap(_.find(Json.obj(), None)(JsObjectWriter, JsObjectWriter).sort(BSONDocument("_id" -> -1)).cursor[Post]()
       .collect[List](-1, Cursor.FailOnError[List[Post]]()))
   }
 
