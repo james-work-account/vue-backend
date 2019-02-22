@@ -18,7 +18,7 @@ class Application @Inject()(mongoConnector: MongoConnector) extends Controller {
   def getAllPosts(): Action[AnyContent] = Action.async {
     mongoConnector.getAllPosts.map {
       posts =>
-        Ok(Json.toJson(posts))
+        Ok(Post.writesList.writes(posts))
     }.recover {
       case ex =>
         logger.error(ex.getMessage, ex)
@@ -80,7 +80,7 @@ class Application @Inject()(mongoConnector: MongoConnector) extends Controller {
   }
 
   private def validatePost(post: Post): List[String] =
-    List((post.id.nonEmpty, "id"), (post.title.nonEmpty, "title"), (post.body.nonEmpty, "body"))
+    List((post.id.nonEmpty, "id"), (post.title.nonEmpty, "title"), (post.body.nonEmpty, "body"), (post.time.nonEmpty, "time"))
       .filterNot(_._1)
       .map(_._2)
 
